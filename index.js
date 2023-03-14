@@ -3,7 +3,7 @@
 require('dotenv').config();
 const { Server } = require('socket.io');
 const axios = require('axios');
-
+const base64 = require('base-64');
 const server = new Server();
 const PORT = 3001;
 server.listen(PORT);
@@ -28,9 +28,12 @@ roomDirectory.forEach(room => {
 });
 console.log(roomTracker);
 
+// decode base64
+// let decodedAuthStr = base64.decode(authString);
+// https://opentdb.com/api.php?amount=10&encode=base64
 
 async function getQuestions() {
-  const otdb = await axios('https://opentdb.com/api.php?amount=10');
+  const otdb = await axios('https://opentdb.com/api.php?amount=10&encode=base64');
   // console.log(otdb.data.results);
 
   let i = 0;
@@ -40,10 +43,10 @@ async function getQuestions() {
     let newQuestion =  {
       type: 'list',
       name: `${i}`,
-      message: question.question,
-      answer: question.correct_answer,
+      message: base64.decode(question.question),
+      answer: base64.decode(question.correct_answer),
       choices: [
-        ...question.incorrect_answers, question.correct_answer,
+        base64.decode(...question.incorrect_answers), base64.decode(question.correct_answer),
       ],
     };
     newQuestion.choices.sort(() => 0.5 - Math.random());
