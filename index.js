@@ -37,7 +37,7 @@ async function getQuestions() {
 
   const questions = await otdb.data.results.map(question => {
     i++;
-    return {
+    let newQuestion =  {
       type: 'list',
       name: `${i}`,
       message: question.question,
@@ -46,7 +46,10 @@ async function getQuestions() {
         ...question.incorrect_answers, question.correct_answer,
       ],
     };
+    newQuestion.choices.sort(() => 0.5 - Math.random());
+    return newQuestion;
   });
+ 
   return questions;
 }
 
@@ -74,7 +77,7 @@ server.on('connection', (socket) => {
 
   socket.on('GAME_START', async () => {
     let questions = await getQuestions();
-    console.log('QUESTIONS---->', questions);
+    // console.log('QUESTIONS---->', questions);
     server.emit('START_TRIVIA', questions);
   });
 
