@@ -68,6 +68,7 @@ server.on('connection', (socket) => {
     let room = roomAndUser.room;
     socket.join(room);
     socket.data.room = room;
+    console.log(socket.data.room);
     roomTracker[room].players++;
     
     if (roomTracker[room].players === 1) {
@@ -108,7 +109,7 @@ server.on('connection', (socket) => {
 
   // DISCONNECT MESSAGE
   socket.on('disconnect', () => {
-    roomTracker[socket.data.room].players - 1;
+    roomTracker[socket.data.room].players--;
     console.log(`User ${socket.id} has disconnected`);
   });
 });
