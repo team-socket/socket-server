@@ -9,17 +9,25 @@ const PORT = 3001;
 server.listen(PORT);
 
 let roomTracker = {
-  coolRoom: {
+//   coolRoom: {
+//     players: 0,
+//     playersCompleted: 0,
+//     superUser: '',
+//     playerScores: [],
+//   },
+};
+const roomDirectory = ['coolRoom', 'sadRoom', 'DoomROOM'];
+
+roomDirectory.forEach(room => {
+  roomTracker[room] = {
     players: 0,
     playersCompleted: 0,
     superUser: '',
     playerScores: [],
-  },
-};
+  };
+});
+console.log(roomTracker);
 
-
-
-const roomDirectory = ['coolRoom', 'sadRoom', 'DoomROOM'];
 
 async function getQuestions() {
   const otdb = await axios('https://opentdb.com/api.php?amount=10');
@@ -51,13 +59,16 @@ server.on('connection', (socket) => {
   });
 
   socket.on('JOIN_ROOM', roomAndUser => {
-    socket.join(roomAndUser.room);
-    roomTracker[roomAndUser.room].players++;
-    if(roomTracker[roomAndUser.room].players === 1){
-      roomTracker[roomAndUser.room].superUser = socket.id;
+    let room = roomAndUser.room;
+    socket.join(room);
+    socket.data.room = room;
+    roomTracker[room].players++;
+    
+    if (roomTracker[room].players === 1) {
+      roomTracker[room].superUser = socket.id;
     }
-    server.to(roomAndUser.room).emit('ROOM_JOINED', roomAndUser);
-    server.to(roomTracker[roomAndUser.room].superUser).emit('PROMPT_START');
+    server.to(room).emit('ROOM_JOINED', roomAndUser);
+    server.to(roomTracker[room].superUser).emit('PROMPT_START');
     // console.log('ROOMS---->', socket.adapter.rooms);
   });
 
@@ -69,9 +80,11 @@ server.on('connection', (socket) => {
 
   socket.on('GAME_OVER', (payload) => {
     roomTracker[payload.currentRoom].playersCompleted++;
-    roomTracker[payload.currentRoom].playerScores.push({player: payload.userName, score: payload.score});
-    if(roomTracker[payload.currentRoom].playersCompleted === roomTracker[payload.currentRoom].players){
+    roomTracker[payload.currentRoom].playerScores.push({ player: payload.userName, score: payload.score });
+    
+    if (roomTracker[payload.currentRoom].playersCompleted === roomTracker[payload.currentRoom].players) {
       server.to(payload.currentRoom).emit('LEADERBOARD', roomTracker[payload.currentRoom].playerScores);
+      roomTracker[payload.currentRoom].playerScores = [];
       roomTracker[payload.currentRoom].playersCompleted = 0;
     }
   });
@@ -89,6 +102,7 @@ server.on('connection', (socket) => {
 
   // DISCONNECT MESSAGE
   socket.on('disconnect', () => {
+    roomTracker[socket.data.room].players - 1;
     console.log(`User ${socket.id} has disconnected`);
   });
 });
