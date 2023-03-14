@@ -18,6 +18,15 @@ let roomTracker = {
 };
 const roomDirectory = ['coolRoom', 'sadRoom', 'DoomROOM'];
 
+const categoryNumber = {
+  'General Knowledge': 9,
+  'Film': 11,
+  'Music': 12,
+  'Video Games': 15,
+  'History': 23,
+  'Science and Nature': 17,
+};
+
 roomDirectory.forEach(room => {
   roomTracker[room] = {
     players: 0,
@@ -32,24 +41,32 @@ console.log(roomTracker);
 // let decodedAuthStr = base64.decode(authString);
 // https://opentdb.com/api.php?amount=10&encode=base64
 
-async function getQuestions() {
-  const otdb = await axios('https://opentdb.com/api.php?amount=10&encode=base64');
+
+
+async function getQuestions(number = 10, category = '') {
+  
+  const otdb = await axios(`https://opentdb.com/api.php?amount=${number}&${category}encode=base64`);
+
+  console.log(otdb);
   // console.log(otdb.data.results);
 
-  let i = 0;
+  let idx = 0;
 
   const questions = await otdb.data.results.map(question => {
-    i++;
+    idx++;
     let newQuestion =  {
       type: 'list',
-      name: `${i}`,
+      name: `${idx}`,
       message: base64.decode(question.question),
       answer: base64.decode(question.correct_answer),
       choices: [
-        base64.decode(...question.incorrect_answers), base64.decode(question.correct_answer),
+        ...question.incorrect_answers, question.correct_answer,
       ],
     };
     newQuestion.choices.sort(() => 0.5 - Math.random());
+    for(let i = 0; i < newQuestion.choices.length; i++){
+      newQuestion.choices[i] = base64.decode(newQuestion.choices[i]);
+    }
     return newQuestion;
   });
  
@@ -68,14 +85,27 @@ server.on('connection', (socket) => {
     let room = roomAndUser.room;
     socket.join(room);
     socket.data.room = room;
+    console.log(socket.data.room);
     roomTracker[room].players++;
     
     if (roomTracker[room].players === 1) {
       roomTracker[room].superUser = socket.id;
+      console.log('superuser', roomTracker[room]);
+      server.to(roomTracker[room].superUser).emit('PROMPT_START');
     }
-    server.to(room).emit('ROOM_JOINED', roomAndUser);
-    server.to(roomTracker[room].superUser).emit('PROMPT_START');
+    server.to(room).emit('ROOM_JOINED', {...roomAndUser, players: roomTracker[room].players}); 
+    if (roomTracker[room].players > 1){
+      server.to(roomTracker[room].superUser).emit('RE_PROMPT_START');
+    }
     // console.log('ROOMS---->', socket.adapter.rooms);
+  });
+
+  socket.on('CUSTOMIZE_GAME', async (settings) => {
+    let category = `category=${categoryNumber[settings.questionCategory]}&`;
+    console.log(category);
+    let number = settings.questionAmount;
+    let questions = await getQuestions(number, category);
+    server.emit('START_TRIVIA', questions);
   });
 
   socket.on('GAME_START', async () => {
@@ -95,6 +125,12 @@ server.on('connection', (socket) => {
     }
   });
 
+  socket.on('RETRY', ()=> {
+    if(roomTracker[socket.data.room].superUser === socket.id){
+      server.to(roomTracker[socket.data.room].superUser).emit('PROMPT_START');
+    }
+  });
+
   // CONSOLE LOGS EACH SOCKET EVENT, DATE, & ATTACHED INFO
   socket.onAny((event, attachedEventInfo) => {
     const eventNotification = {
@@ -108,7 +144,7 @@ server.on('connection', (socket) => {
 
   // DISCONNECT MESSAGE
   socket.on('disconnect', () => {
-    roomTracker[socket.data.room].players - 1;
+    roomTracker[socket.data.room].players--;
     console.log(`User ${socket.id} has disconnected`);
   });
 });
