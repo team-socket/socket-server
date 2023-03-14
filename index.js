@@ -2,13 +2,45 @@
 
 require('dotenv').config();
 const { Server } = require('socket.io');
+const axios = require('axios');
 
 const server = new Server();
 const PORT = 3001;
 server.listen(PORT);
 
+let roomTracker = {
+  coolRoom: {
+    players: 0,
+    playersCompleted: 0,
+    superUser: '',
+    playerScores: [],
+  },
+};
+
+
 
 const roomDirectory = ['coolRoom', 'sadRoom', 'DoomROOM'];
+
+async function getQuestions() {
+  const otdb = await axios('https://opentdb.com/api.php?amount=10');
+  // console.log(otdb.data.results);
+
+  let i = 0;
+
+  const questions = await otdb.data.results.map(question => {
+    i++;
+    return {
+      type: 'list',
+      name: `${i}`,
+      message: question.question,
+      answer: question.correct_answer,
+      choices: [
+        ...question.incorrect_answers, question.correct_answer,
+      ],
+    };
+  });
+  return questions;
+}
 
 // SOCKET.IO SINGLETON
 server.on('connection', (socket) => {
@@ -20,11 +52,28 @@ server.on('connection', (socket) => {
 
   socket.on('JOIN_ROOM', roomAndUser => {
     socket.join(roomAndUser.room);
+    roomTracker[roomAndUser.room].players++;
+    if(roomTracker[roomAndUser.room].players === 1){
+      roomTracker[roomAndUser.room].superUser = socket.id;
+    }
     server.to(roomAndUser.room).emit('ROOM_JOINED', roomAndUser);
+    server.to(roomTracker[roomAndUser.room].superUser).emit('PROMPT_START');
+    // console.log('ROOMS---->', socket.adapter.rooms);
   });
 
-  socket.on('START_TRIVIA', (questions) => {
+  socket.on('GAME_START', async () => {
+    let questions = await getQuestions();
+    console.log('QUESTIONS---->', questions);
     server.emit('START_TRIVIA', questions);
+  });
+
+  socket.on('GAME_OVER', (payload) => {
+    roomTracker[payload.currentRoom].playersCompleted++;
+    roomTracker[payload.currentRoom].playerScores.push({player: payload.userName, score: payload.score});
+    if(roomTracker[payload.currentRoom].playersCompleted === roomTracker[payload.currentRoom].players){
+      server.to(payload.currentRoom).emit('LEADERBOARD', roomTracker[payload.currentRoom].playerScores);
+      roomTracker[payload.currentRoom].playersCompleted = 0;
+    }
   });
 
   // CONSOLE LOGS EACH SOCKET EVENT, DATE, & ATTACHED INFO
@@ -43,6 +92,9 @@ server.on('connection', (socket) => {
     console.log(`User ${socket.id} has disconnected`);
   });
 });
+
+
+
 
 
 
