@@ -15,7 +15,6 @@ sequelizeDB.sync().then(() => {
 
 }).catch(e => console.error(e));
 
-
 let roomTracker = {
   //   coolRoom: {
   //     players: 0,
@@ -44,11 +43,6 @@ roomDirectory.forEach(room => {
   };
 });
 console.log(roomTracker);
-
-// decode base64
-// let decodedAuthStr = base64.decode(authString);
-// https://opentdb.com/api.php?amount=10&encode=base64
-
 
 
 async function getQuestions(number = 10, category = '') {
@@ -98,6 +92,12 @@ server.on('connection', (socket) => {
     } else {
       socket.emit('USER_EXISTS');
     }
+  });
+
+  socket.on('GET_PASSPHRASE', async (username) => {
+    console.log(username);
+    const userInfo = await userCollection.read(username);
+    socket.emit('RETURN_PASSPHRASE', userInfo.passphrase);
   });
 
   socket.on('LOGIN_USER', async (payload) => {
