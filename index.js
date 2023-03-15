@@ -146,18 +146,32 @@ server.on('connection', (socket) => {
     console.log(category);
     let number = settings.questionAmount;
     let questions = await getQuestions(number, category);
-    server.emit('START_TRIVIA', questions);
+    server.emit('START_TRIVIA', { questions, questionAmount: number});
   });
 
   socket.on('GAME_START', async () => {
     let questions = await getQuestions();
     // console.log('QUESTIONS---->', questions);
-    server.emit('START_TRIVIA', questions);
+    server.emit('START_TRIVIA', { questions, questionAmount: 10 });
   });
 
-  socket.on('GAME_OVER', (payload) => {
+  socket.on('GAME_OVER', async (payload) => {
+    if ('User is authenticated') {
+      const userStats = await userCollection.read(payload.username);
+      console.log(userStats);
+      const updatedStats = {
+        username: payload.username,
+        passphrase: userStats.passphrase,
+        score: userStats.score + payload.score,
+        gamesPlayed: userStats.gamesPlayed+1,
+        totalQuestions: userStats.totalQuestions + payload.questionAmount, 
+      }; 
+      console.log(updatedStats);
+
+      await userCollection.update(updatedStats, payload.username);
+    }
     roomTracker[payload.currentRoom].playersCompleted++;
-    roomTracker[payload.currentRoom].playerScores.push({ player: payload.userName, score: payload.score });
+    roomTracker[payload.currentRoom].playerScores.push({ player: payload.username, score: payload.score });
 
     if (roomTracker[payload.currentRoom].playersCompleted === roomTracker[payload.currentRoom].players) {
       server.to(payload.currentRoom).emit('LEADERBOARD', roomTracker[payload.currentRoom].playerScores);
