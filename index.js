@@ -6,15 +6,23 @@ const axios = require('axios');
 const base64 = require('base-64');
 const server = new Server();
 const PORT = 3001;
-server.listen(PORT);
+const { sequelizeDB } = require('./model');
+const { userCollection } = require('./model');
+
+sequelizeDB.sync().then(() => {
+  console.log('Database is connected');
+  server.listen(PORT);
+
+}).catch(e => console.error(e));
+
 
 let roomTracker = {
-//   coolRoom: {
-//     players: 0,
-//     playersCompleted: 0,
-//     superUser: '',
-//     playerScores: [],
-//   },
+  //   coolRoom: {
+  //     players: 0,
+  //     playersCompleted: 0,
+  //     superUser: '',
+  //     playerScores: [],
+  //   },
 };
 const roomDirectory = ['coolRoom', 'sadRoom', 'DoomROOM'];
 
@@ -44,7 +52,7 @@ console.log(roomTracker);
 
 
 async function getQuestions(number = 10, category = '') {
-  
+
   const otdb = await axios(`https://opentdb.com/api.php?amount=${number}&${category}encode=base64`);
 
   console.log(otdb);
@@ -54,7 +62,7 @@ async function getQuestions(number = 10, category = '') {
 
   const questions = await otdb.data.results.map(question => {
     idx++;
-    let newQuestion =  {
+    let newQuestion = {
       type: 'list',
       name: `${idx}`,
       message: base64.decode(question.question),
@@ -64,18 +72,51 @@ async function getQuestions(number = 10, category = '') {
       ],
     };
     newQuestion.choices.sort(() => 0.5 - Math.random());
-    for(let i = 0; i < newQuestion.choices.length; i++){
+    for (let i = 0; i < newQuestion.choices.length; i++) {
       newQuestion.choices[i] = base64.decode(newQuestion.choices[i]);
     }
     return newQuestion;
   });
- 
+
   return questions;
 }
 
 // SOCKET.IO SINGLETON
 server.on('connection', (socket) => {
   console.log(`New user connected with ${socket.id}.`);
+
+  socket.on('CREATE_USER', async (payload) => {
+    let test = {
+      username: payload.username,
+      passphrase: payload.passphrase,
+    };
+    const userCheck = await userCollection.read(payload.username);
+    if(!userCheck){
+      const newUser = await userCollection.create(test);
+      console.log('User created', newUser);
+      socket.emit('LOGIN_GRANTED');
+    } else {
+      socket.emit('USER_EXISTS');
+    }
+  });
+
+  socket.on('LOGIN_USER', async (payload) => {
+    const userInfo = await userCollection.read(payload.username);
+    if(!userInfo){
+      socket.emit('INVALID_LOGIN');
+    } else {
+      if(userInfo.passphrase === payload.passphrase){
+        socket.emit('LOGIN_GRANTED');
+      } else {
+        socket.emit('INVALID_LOGIN');
+      }
+    }
+  });
+
+  socket.on('GET_STATS', async (username) => {
+    const userStats = await userCollection.read(username);
+    socket.emit('USER_STATS', userStats);
+  });
 
   socket.on('GET_OPEN_ROOMS', () => {
     socket.emit('RECEIVE_ROOM_NAMES', roomDirectory);
@@ -87,14 +128,14 @@ server.on('connection', (socket) => {
     socket.data.room = room;
     console.log(socket.data.room);
     roomTracker[room].players++;
-    
+
     if (roomTracker[room].players === 1) {
       roomTracker[room].superUser = socket.id;
       console.log('superuser', roomTracker[room]);
       server.to(roomTracker[room].superUser).emit('PROMPT_START');
     }
-    server.to(room).emit('ROOM_JOINED', {...roomAndUser, players: roomTracker[room].players}); 
-    if (roomTracker[room].players > 1){
+    server.to(room).emit('ROOM_JOINED', { ...roomAndUser, players: roomTracker[room].players });
+    if (roomTracker[room].players > 1) {
       server.to(roomTracker[room].superUser).emit('RE_PROMPT_START');
     }
     // console.log('ROOMS---->', socket.adapter.rooms);
@@ -117,7 +158,7 @@ server.on('connection', (socket) => {
   socket.on('GAME_OVER', (payload) => {
     roomTracker[payload.currentRoom].playersCompleted++;
     roomTracker[payload.currentRoom].playerScores.push({ player: payload.userName, score: payload.score });
-    
+
     if (roomTracker[payload.currentRoom].playersCompleted === roomTracker[payload.currentRoom].players) {
       server.to(payload.currentRoom).emit('LEADERBOARD', roomTracker[payload.currentRoom].playerScores);
       roomTracker[payload.currentRoom].playerScores = [];
@@ -125,8 +166,8 @@ server.on('connection', (socket) => {
     }
   });
 
-  socket.on('RETRY', ()=> {
-    if(roomTracker[socket.data.room].superUser === socket.id){
+  socket.on('RETRY', () => {
+    if (roomTracker[socket.data.room].superUser === socket.id) {
       server.to(roomTracker[socket.data.room].superUser).emit('PROMPT_START');
     }
   });
@@ -144,7 +185,9 @@ server.on('connection', (socket) => {
 
   // DISCONNECT MESSAGE
   socket.on('disconnect', () => {
-    roomTracker[socket.data.room].players--;
+    if(socket.data.room){
+      roomTracker[socket.data.room].players--;
+    }
     console.log(`User ${socket.id} has disconnected`);
   });
 });
