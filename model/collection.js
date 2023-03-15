@@ -34,9 +34,10 @@ class Collection {
     }
   }
 
-  async update(json, id) {
+  async update(json, username) {
     try {
-      const record = await this.model.update(json, { where: { id } });
+      console.log(json, username);
+      const record = await this.model.update(json, { where: { username } });
       return record;
     } catch (error) {
       console.error('error in the collection interface');
@@ -44,9 +45,9 @@ class Collection {
     }
   }
 
-  async delete(id) {
+  async delete(username) {
     try {
-      await this.model.destroy({ where: { id } });
+      await this.model.destroy({ where: { username } });
 
     } catch (error) {
       console.error('error in the collection interface');
