@@ -196,6 +196,7 @@ server.on('connection', (socket) => {
     roomTracker[socket.data.room].players--;
     socket.leave(socket.data.room);
     socket.data.room = '';
+    socket.emit('ROOM_EXITED');
   });
 
   
