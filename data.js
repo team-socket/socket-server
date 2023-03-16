@@ -48,8 +48,6 @@ const DESCRIPTORS = [
 ];
 
 const NOUNS = [
-  'Pin in It',
-  'For the Sake of Time',
   'Darkness',
   'Giraffe',
   'Table',

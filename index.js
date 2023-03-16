@@ -4,6 +4,7 @@ require('dotenv').config();
 const { Server } = require('socket.io');
 const axios = require('axios');
 const base64 = require('base-64');
+const { DESCRIPTORS, NOUNS } = require('./data');
 const server = new Server();
 const PORT = 3001;
 const { sequelizeDB } = require('./model');
@@ -16,6 +17,7 @@ sequelizeDB.sync().then(() => {
 }).catch(e => console.error(e));
 
 let roomTracker = {
+  // TEMPLATE
   //   coolRoom: {
   //     players: 0,
   //     playersCompleted: 0,
@@ -23,7 +25,18 @@ let roomTracker = {
   //     playerScores: [],
   //   },
 };
-const roomDirectory = ['coolRoom', 'sadRoom', 'DoomROOM'];
+
+const generateRoomName = () => {
+  let name = '';
+  name = `${DESCRIPTORS[Math.floor(Math.random() * DESCRIPTORS.length)]} ${NOUNS[Math.floor(Math.random() * NOUNS.length)]}`;
+  return name;
+};
+
+const roomDirectory = [];
+
+for (let i = 0; i < 5; i++) {
+  roomDirectory.push(generateRoomName());
+}
 
 const categoryNumber = {
   'General Knowledge': 9,
@@ -83,7 +96,7 @@ server.on('connection', (socket) => {
       passphrase: payload.passphrase,
     };
     const userCheck = await userCollection.read(payload.username);
-    if(!userCheck){
+    if (!userCheck) {
       const newUser = await userCollection.create(test);
       console.log('User created', newUser);
       socket.emit('LOGIN_GRANTED');
@@ -100,10 +113,10 @@ server.on('connection', (socket) => {
 
   socket.on('LOGIN_USER', async (payload) => {
     const userInfo = await userCollection.read(payload.username);
-    if(!userInfo){
+    if (!userInfo) {
       socket.emit('INVALID_LOGIN');
     } else {
-      if(userInfo.passphrase === payload.passphrase){
+      if (userInfo.passphrase === payload.passphrase) {
         socket.emit('LOGIN_GRANTED');
       } else {
         socket.emit('INVALID_LOGIN');
@@ -140,14 +153,22 @@ server.on('connection', (socket) => {
   });
 
   socket.on('CUSTOMIZE_GAME', async (settings) => {
+    console.log('ROOM remove=====', roomDirectory, settings.room, roomDirectory.indexOf(settings.room));
+    roomDirectory.splice(roomDirectory.indexOf(settings.room), 1);
+    console.log('ROOM remove=====', roomDirectory);
+
     let category = `category=${categoryNumber[settings.questionCategory]}&`;
     console.log(category);
     let number = settings.questionAmount;
     let questions = await getQuestions(number, category);
-    server.emit('START_TRIVIA', { questions, questionAmount: number});
+    server.emit('START_TRIVIA', { questions, questionAmount: number });
   });
 
-  socket.on('GAME_START', async () => {
+  socket.on('GAME_START', async (room) => {
+    console.log('ROOM remove=====', roomDirectory, room, roomDirectory.indexOf(room));
+    roomDirectory.splice(roomDirectory.indexOf(room), 1);
+    console.log('ROOM remove=====', roomDirectory);
+
     let questions = await getQuestions();
     // console.log('QUESTIONS---->', questions);
     server.emit('START_TRIVIA', { questions, questionAmount: 10 });
@@ -161,9 +182,9 @@ server.on('connection', (socket) => {
         username: payload.username,
         passphrase: userStats.passphrase,
         score: userStats.score + payload.score,
-        gamesPlayed: userStats.gamesPlayed+1,
-        totalQuestions: userStats.totalQuestions + payload.questionAmount, 
-      }; 
+        gamesPlayed: userStats.gamesPlayed + 1,
+        totalQuestions: userStats.totalQuestions + payload.questionAmount,
+      };
       console.log(updatedStats);
 
       await userCollection.update(updatedStats, payload.username);
@@ -172,6 +193,9 @@ server.on('connection', (socket) => {
     roomTracker[payload.currentRoom].playerScores.push({ player: payload.username, score: payload.score });
 
     if (roomTracker[payload.currentRoom].playersCompleted === roomTracker[payload.currentRoom].players) {
+      roomDirectory.push(payload.currentRoom);
+      console.log('ROOM ADD=====', roomDirectory);
+
       server.to(payload.currentRoom).emit('LEADERBOARD', roomTracker[payload.currentRoom].playerScores);
       roomTracker[payload.currentRoom].playerScores = [];
       roomTracker[payload.currentRoom].playersCompleted = 0;
@@ -184,6 +208,22 @@ server.on('connection', (socket) => {
     }
   });
 
+  socket.on('LEAVE_ROOM', () => {
+    roomTracker[socket.data.room].players--;
+    socket.leave(socket.data.room);
+    socket.data.room = '';
+  });
+
+  
+  // DISCONNECT MESSAGE
+  socket.on('disconnect', () => {
+    if (socket.data.room) {
+      roomTracker[socket.data.room].players--;
+    }
+    console.log(`User ${socket.id} has disconnected`);
+  });
+
+
   // CONSOLE LOGS EACH SOCKET EVENT, DATE, & ATTACHED INFO
   socket.onAny((event, attachedEventInfo) => {
     const eventNotification = {
@@ -192,15 +232,6 @@ server.on('connection', (socket) => {
       attachedEventInfo,
     };
     console.log('EVENT', eventNotification);
-  });
-
-
-  // DISCONNECT MESSAGE
-  socket.on('disconnect', () => {
-    if(socket.data.room){
-      roomTracker[socket.data.room].players--;
-    }
-    console.log(`User ${socket.id} has disconnected`);
   });
 });
 
