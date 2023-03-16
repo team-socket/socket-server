@@ -48,8 +48,6 @@ console.log(roomTracker);
 async function getQuestions(number = 10, category = '') {
 
   const otdb = await axios(`https://opentdb.com/api.php?amount=${number}&${category}encode=base64`);
-
-  console.log(otdb);
   // console.log(otdb.data.results);
 
   let idx = 0;
@@ -207,7 +205,7 @@ server.on('connection', (socket) => {
 });
 
 
-
+module.exports = { getQuestions };
 
 
 
