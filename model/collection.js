@@ -7,9 +7,9 @@ class Collection {
 
   async create(json) {
     try {
-      console.log('JSON SENT TO CREATE------>>>>>', json);
+      // console.log('JSON SENT TO CREATE------>>>>>', json);
       const record = await this.model.create(json);
-      console.log('RETURNED RECORD---->>>', record);
+      // console.log('RETURNED RECORD---->>>', record);
       return record;
     } catch (error) {
       console.error('error in the collection interface');
