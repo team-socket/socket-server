@@ -201,7 +201,7 @@ server.on('connection', (socket) => {
   
   // DISCONNECT MESSAGE
   socket.on('disconnect', () => {
-    if (socket.data.room) {
+    if (socket.data.room && socket.data.room !== '') {
       roomTracker[socket.data.room].players--;
     }
     console.log(`User ${socket.id} has disconnected`);
