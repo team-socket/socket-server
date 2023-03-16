@@ -150,7 +150,7 @@ server.on('connection', (socket) => {
     let number = settings.questionAmount;
     let questions = await getQuestions(number, category);
     
-    server.emit('START_TRIVIA', { questions, questionAmount: number });
+    server.to(settings.room).emit('START_TRIVIA', { questions, questionAmount: number });
   });
 
   socket.on('GAME_START', async (room) => {
@@ -158,7 +158,7 @@ server.on('connection', (socket) => {
 
     let questions = await getQuestions();
 
-    server.emit('START_TRIVIA', { questions, questionAmount: 10 });
+    server.to(room).emit('START_TRIVIA', { questions, questionAmount: 10 });
   });
 
   socket.on('GAME_OVER', async (payload) => {
