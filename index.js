@@ -13,7 +13,6 @@ const { userCollection } = require('./model');
 sequelizeDB.sync().then(() => {
   console.log('Database is connected');
   server.listen(PORT);
-
 }).catch(e => console.error(e));
 
 let roomTracker = {
@@ -55,13 +54,9 @@ roomDirectory.forEach(room => {
     playerScores: [],
   };
 });
-console.log(roomTracker);
-
 
 async function getQuestions(number = 10, category = '') {
-
   const otdb = await axios(`https://opentdb.com/api.php?amount=${number}&${category}encode=base64`);
-  // console.log(otdb.data.results);
 
   let idx = 0;
 
@@ -106,7 +101,6 @@ server.on('connection', (socket) => {
   });
 
   socket.on('GET_PASSPHRASE', async (username) => {
-    console.log(username);
     const userInfo = await userCollection.read(username);
     socket.emit('RETURN_PASSPHRASE', userInfo.passphrase);
   });
@@ -137,47 +131,39 @@ server.on('connection', (socket) => {
     let room = roomAndUser.room;
     socket.join(room);
     socket.data.room = room;
-    console.log(socket.data.room);
     roomTracker[room].players++;
 
     if (roomTracker[room].players === 1) {
       roomTracker[room].superUser = socket.id;
-      console.log('superuser', roomTracker[room]);
       server.to(roomTracker[room].superUser).emit('PROMPT_START');
     }
     server.to(room).emit('ROOM_JOINED', { ...roomAndUser, players: roomTracker[room].players });
     if (roomTracker[room].players > 1) {
       server.to(roomTracker[room].superUser).emit('RE_PROMPT_START');
     }
-    // console.log('ROOMS---->', socket.adapter.rooms);
   });
 
   socket.on('CUSTOMIZE_GAME', async (settings) => {
-    console.log('ROOM remove=====', roomDirectory, settings.room, roomDirectory.indexOf(settings.room));
     roomDirectory.splice(roomDirectory.indexOf(settings.room), 1);
-    console.log('ROOM remove=====', roomDirectory);
 
     let category = `category=${categoryNumber[settings.questionCategory]}&`;
-    console.log(category);
     let number = settings.questionAmount;
     let questions = await getQuestions(number, category);
+    
     server.emit('START_TRIVIA', { questions, questionAmount: number });
   });
 
   socket.on('GAME_START', async (room) => {
-    console.log('ROOM remove=====', roomDirectory, room, roomDirectory.indexOf(room));
     roomDirectory.splice(roomDirectory.indexOf(room), 1);
-    console.log('ROOM remove=====', roomDirectory);
 
     let questions = await getQuestions();
-    // console.log('QUESTIONS---->', questions);
+
     server.emit('START_TRIVIA', { questions, questionAmount: 10 });
   });
 
   socket.on('GAME_OVER', async (payload) => {
-    if ('User is authenticated') {
+    if ('User is authenticated') {  // LEFT IN FOR FUTURE GUEST LOGIN
       const userStats = await userCollection.read(payload.username);
-      console.log(userStats);
       const updatedStats = {
         username: payload.username,
         passphrase: userStats.passphrase,
@@ -185,7 +171,6 @@ server.on('connection', (socket) => {
         gamesPlayed: userStats.gamesPlayed + 1,
         totalQuestions: userStats.totalQuestions + payload.questionAmount,
       };
-      console.log(updatedStats);
 
       await userCollection.update(updatedStats, payload.username);
     }
@@ -194,7 +179,6 @@ server.on('connection', (socket) => {
 
     if (roomTracker[payload.currentRoom].playersCompleted === roomTracker[payload.currentRoom].players) {
       roomDirectory.push(payload.currentRoom);
-      console.log('ROOM ADD=====', roomDirectory);
 
       server.to(payload.currentRoom).emit('LEADERBOARD', roomTracker[payload.currentRoom].playerScores);
       roomTracker[payload.currentRoom].playerScores = [];
@@ -235,44 +219,4 @@ server.on('connection', (socket) => {
   });
 });
 
-
 module.exports = { getQuestions };
-
-
-
-// SOCKET SERVER CHEATSHEET
-
-// SEE ALL CURRENT ROOMS
-// socket.adapter.rooms
-
-// server.on("connection", (socket) => {
-
-//   // basic emit
-//   socket.emit(/* ... */);
-
-//   // to all clients in the current namespace except the sender
-//   socket.broadcast.emit(/* ... */);
-
-//   // to all clients in room1 except the sender
-//   socket.to("room1").emit(/* ... */);
-
-//   // to all clients in room1 and/or room2 except the sender
-//   socket.to("room1").to("room2").emit(/* ... */);
-
-//   // to all clients in room1
-//   server.in("room1").emit(/* ... */);
-
-//   // to all clients in namespace "myNamespace"
-//   server.of("myNamespace").emit(/* ... */);
-
-//   // to all clients in room1 in namespace "myNamespace"
-//   server.of("myNamespace").to("room1").emit(/* ... */);
-
-//   // to individual socketid (private message)
-//   server.to(socketId).emit(/* ... */);
-
-//   // to all clients on this node (when using multiple nodes)
-//   server.local.emit(/* ... */);
-
-//   // to all connected clients
-//   server.emit(/* ... */);
