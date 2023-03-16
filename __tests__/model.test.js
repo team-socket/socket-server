@@ -2,6 +2,8 @@
 
 const { sequelizeDB, userCollection } = require('../model');
 
+console.error = jest.fn();
+
 beforeAll(async () => {
   await sequelizeDB.sync();
   await userCollection.create({ username: 'test', passphrase: 'testing test' });
@@ -66,6 +68,34 @@ describe('handle models', () => {
     expect(response[1].username).toEqual('test3');
     expect(response[1].passphrase).toEqual('testing test 3');
 
+  });
+
+  it('should error on create correctly', async () => {
+
+    await userCollection.create({ passphrase: 'testing test 3' });
+
+    expect(console.error).toHaveBeenCalledWith('error in the collection interface');
+  });
+
+  it('should error on read correctly', async () => {
+
+    await userCollection.read({ passphrase: 'testing test 3' });
+
+    expect(console.error).toHaveBeenCalledWith('error in the collection interface');
+  });
+
+  it('should error on update correctly', async () => {
+
+    await userCollection.update({ passphrase: 'testing test 3' });
+
+    expect(console.error).toHaveBeenCalledWith('error in the collection interface');
+  });
+
+  it('should error on delete correctly', async () => {
+
+    await userCollection.delete({ passphrase: 'testing test 3' });
+
+    expect(console.error).toHaveBeenCalledWith('error in the collection interface');
   });
 
 });
