@@ -11,7 +11,6 @@ const DESCRIPTORS = [
   'Wonky',
   'Checkered',
   'Spindly',
-  'Lorge',
   'Fluffy',
   'Ragin',
   'Partyrific',
